@@ -3,13 +3,17 @@ import numpy as np
 
 capture = cv2.VideoCapture(0) # Read camera input
 
+'''
+BLOB DETECT CONFIG GOES HERE
+'''
+
 while capture.isOpened():
     ret, frame = capture.read()
     if ret: # If the camera read is successful, process the image
         result = cv2.rotate(frame, cv2.ROTATE_180)
 
         '''
-        YOUR CODE GOES HERE
+        DICE LOCALIZATION LOGIC GOES HERE
         '''
 
         # Display the processed image with window title "Capture"
