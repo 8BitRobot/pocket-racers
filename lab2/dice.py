@@ -8,9 +8,9 @@ while capture.isOpened():
     if ret: # If the camera read is successful, process the image
         result = cv2.rotate(frame, cv2.ROTATE_180)
 
-        '''
-        YOUR CODE GOES HERE
-        '''
+        ''' PART 1 '''
+
+
 
         # Display the processed image with window title "Capture"
         cv2.imshow("Capture", result)
