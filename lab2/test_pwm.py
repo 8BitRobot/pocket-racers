@@ -4,7 +4,8 @@ GPIO.setmode(GPIO.BOARD)
 
 GPIO.setup(7, GPIO.OUT)
 p = GPIO.PWM(7, 50)
-p.start(30)
+p.start(0)
+p.ChangeDutyCycle(30)
 
 try:
     while True:
