@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import RPi.GPIO as GPIO
 from threading import Thread
+from multiprocessing import Process
 from queue import Queue
 import time
 from picamera.array import PiRGBArray
@@ -20,11 +21,13 @@ class PiVideoStream:
         # if the thread should be stopped
         self.frame = None
         self.stopped = False
+        self.process = None
 
 
     def start(self):
         # start the thread to read frames from the video stream
-        Thread(target=self.update, args=()).start()
+        self.process = Process(target=self.update, args=())
+        self.process.start()
         return self
     
 
@@ -35,12 +38,14 @@ class PiVideoStream:
             # preparation for the next frame
             self.frame = f.array
             self.rawCapture.truncate(0)
+            print(self.frame)
             # if the thread indicator variable is set, stop the thread
             # and resource camera resources
             if self.stopped:
                 self.stream.close()
                 self.rawCapture.close()
                 self.camera.close()
+                self.process.join()
                 return
 
     def read(self):
@@ -53,28 +58,11 @@ class PiVideoStream:
         self.stopped = True
 
 
-print("[INFO] sampling THREADED frames from `picamera` module...")
+print("[INFO] sampling MULTIPROCESSED frames from `picamera` module...")
 vs = PiVideoStream(resolution=(640,480)).start()
 time.sleep(2.0)
-'''
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BOARD)
-
-GPIO.setup(7, GPIO.OUT)
-pi_pwm = GPIO.PWM(7, 50)
-pi_pwm.start(0)
-
-def output_result(dot_count):
-    global pi_pwm
-    duty_cycles = range(0, 97, 8)
-    try:
-        pi_pwm.ChangeDutyCycle(duty_cycles[dot_count])
-    except:
-        pi_pwm.ChangeDutyCycle(0)
-'''
 
 def part2_checkoff(img, contours, contour_index, moment, midline, instruction):
-    
     img = cv2.drawContours(img, contours, contour_index, (0,0,255), 3)
     img = cv2.circle(img, (moment[0], moment[1]), 3, (0,255,0), 3)
     
@@ -168,26 +156,20 @@ def detect_shape(color_img):
     color_img = part2_checkoff(color_img, contours, lc_i, moment, midline, instruction)
 
     cv2.imshow("Capture", color_img)
-    return 0
+    return instruction
 
 frame_count = 0
 try:
     while True:
         result = vs.read()
+        print(result)
         frame_count += 1
         img = cv2.rotate(result, cv2.ROTATE_180)
         if frame_count == 1:
             print(img.shape)
-        ''' PART 1 '''
 
-        points = detect_shape(img)
-
+        detect_shape(img)
  
-        # Uncomment these two lines when getting checked off.
-
-        # if frame_count % 3 == 0:
-        #     output_result(len(points))
-
         k = cv2.waitKey(3)
         if k == ord('q'):
             # If you press 'q' in the OpenCV window, the program will stop running.
