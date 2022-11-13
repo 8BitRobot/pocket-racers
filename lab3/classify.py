@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import RPi.GPIO as GPIO
 from threading import Thread
-from multiprocessing import Process
+from multiprocessing import Process, Pipe
 from queue import Queue
 import time
 from picamera.array import PiRGBArray
@@ -25,20 +25,22 @@ class PiVideoStream:
 
 
     def start(self):
+        pipe_in, self.pipe_out = Pipe()
         # start the thread to read frames from the video stream
-        self.process = Process(target=self.update, args=())
+        self.process = Process(target=self.update, args=(pipe_in), daemon=True)
         self.process.start()
         return self
     
 
-    def update(self):
+    def update(self, pipe_in):
         # keep looping infinitely until the thread is stopped
         for f in self.stream:
             # grab the frame from the stream and clear the stream in
             # preparation for the next frame
             self.frame = f.array
+            pipe_in.send([self.frame])
             self.rawCapture.truncate(0)
-            print(self.frame)
+            # print(self.frame)
             # if the thread indicator variable is set, stop the thread
             # and resource camera resources
             if self.stopped:
@@ -50,7 +52,10 @@ class PiVideoStream:
 
     def read(self):
         # return the frame most recently read
-        return self.frame
+        if self.pipe_out.poll():
+            return self.pipe_out.recv()[0]
+        else:
+            return None
 
 
     def stop(self):
@@ -161,23 +166,24 @@ def detect_shape(color_img):
 frame_count = 0
 try:
     while True:
-        result = vs.read()
-        print(result)
-        frame_count += 1
-        img = cv2.rotate(result, cv2.ROTATE_180)
-        if frame_count == 1:
-            print(img.shape)
+        if vs.pipe_out.poll():
+            result = vs.read()
+            print(result)
+            frame_count += 1
+            img = cv2.rotate(result, cv2.ROTATE_180)
+            if frame_count == 1:
+                print(img.shape)
 
-        detect_shape(img)
- 
-        k = cv2.waitKey(3)
-        if k == ord('q'):
-            # If you press 'q' in the OpenCV window, the program will stop running.
-            break
-        elif k == ord('p'):
-            # If you press 'p', the camera feed will be paused until you press
-            # <Enter> in the terminal.
-            input()
+            detect_shape(img)
+    
+            k = cv2.waitKey(3)
+            if k == ord('q'):
+                # If you press 'q' in the OpenCV window, the program will stop running.
+                break
+            elif k == ord('p'):
+                # If you press 'p', the camera feed will be paused until you press
+                # <Enter> in the terminal.
+                input()
 except KeyboardInterrupt:
     pass
 
