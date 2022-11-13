@@ -8,6 +8,10 @@ import time
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 
+'''
+DO NOT CHANGE THIS CLASS.
+Parallelizes the image retrieval and processing across two cores on the Pi.
+'''
 class PiVideoStream:
     def __init__(self, resolution=(640, 480), framerate=32):
         self.process = None
@@ -68,6 +72,33 @@ print("[INFO] sampling MULTIPROCESSED frames from `picamera` module...")
 vs = PiVideoStream(resolution=(640,480)).start()
 time.sleep(2.0)
 
+'''
+DO NOT CHANGE THIS FUNCTION.
+
+Annotates your filtered image with the values you calculate.
+
+PARAMETERS:
+img -               Your filtered BINARY image, converted to BGR or
+                    RGB form using cv2.cvtColor().
+
+contours -          The list of all contours in the image.
+
+contour_index -     The index of the specific contour to annotate.
+
+moment -            The coordinates of the moment of inertia of
+                    the contour at `contour_index`. Represented as an
+                    iterable with 2 elements (x, y).
+
+midline -           The starting and ending points of the line that
+                    divides the contour's bounding box in half,
+                    horizontally. Represented as an iterable with 2
+                    tuples, ( (sx,sy) , (ex,ey) ), where `sx` and `sy`
+                    represent the starting point and `ex` and `ey` the
+                    ending point.
+
+instruction -       A string chosen from "left", "right", "straight", "stop",
+                    or "idle".
+'''
 def part2_checkoff(img, contours, contour_index, moment, midline, instruction):
     img = cv2.drawContours(img, contours, contour_index, (0,0,255), 3)
     img = cv2.circle(img, (moment[0], moment[1]), 3, (0,255,0), 3)
@@ -92,24 +123,22 @@ def part2_checkoff(img, contours, contour_index, moment, midline, instruction):
 def detect_shape(color_img):
     '''
     PART 1
-    Isolate (but do not detect) the arrow/stop sign using image filtering techniques.
+    Isolate (but do not detect) the arrow/stop sign using image filtering techniques. 
+    Return a mask that isolates a black shape on white paper
 
     Checkoffs: None for this part!
     '''
-    img = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
-    img = cv2.GaussianBlur(img,ksize=(5, 5), sigmaX=0)
-    ret, img = cv2.threshold(img, 120, 255, cv2.THRESH_BINARY)
-    img[0:100] = 0
     
-    h, w = img.shape[:2]
-    mask = np.zeros((h + 2, w + 2), np.uint8)
-    cv2.floodFill(img, mask, (0, 0), 255)
+    img = color_img
+
     '''
     END OF PART 1
     '''
 
-    color_img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    # Create the color image for annotating.
+    formatted_img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     
+    # Find contours in the filtered image.
     contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     if len(contours) == 0:
         return
@@ -118,74 +147,54 @@ def detect_shape(color_img):
     PART 2
     1. Identify the contour with the largest area.
     2. Find the centroid of that contour.
-    3. Determine whether the contour represents a stop sign or an arrow.
-    4. Use the format_contour() helper function to produce the formatted image.
+    3. Determine whether the contour represents a stop sign or an arrow. If it's an
+       arrow, determine which direction it's pointing.
+    4. Set instruction to 'stop' 'idle' 'left' 'right' 'straight' depending on the output
+    5. Use the part2_checkoff() helper function to produce the formatted image. See
+       above for documentation on how to use it.
 
     Checkoffs: Send this formatted image to your leads in your team's Discord group chat.
     '''
-
-    lc_i = -1 # largest contour index
-    lc_area = 0 # largest contour area
-
-    for i in range(len(contours)):
-        hierarchy_entry = hierarchy[0][i]
-        if hierarchy_entry[3] == -1:
-            continue
-        if (area := cv2.contourArea(contours[i])) > lc_area:
-            lc_i = i
-            lc_area = area
-
-    print(lc_area)
-
-    lc_moment = cv2.moments(contours[lc_i])
-    try:
-        mx = int(lc_moment['m10'] / lc_moment['m00']) # X-coord of contour's moment of inertia
-        my = int(lc_moment['m01'] / lc_moment['m00']) # Y-coord of contour's moment of inertia
-    except:
-        return
-
-    moment = (mx, my)
     
-    x,y,w,h = cv2.boundingRect(contours[lc_i])
-    middle = x + w//2
-    midline = [(middle, y), (middle, y+h)]
-  
-    convexity = lc_area / cv2.contourArea(cv2.convexHull(contours[lc_i]))
-    if (lc_area < 10000  and lc_area > 3000) or \
-       (lc_area < 30000 and lc_area > 18000):
-        if convexity > 0.9:
-            instruction = "stop"
-        else:
-            if mx < middle - 20:
-                instruction = "left"
-            elif mx > middle + 20:
-                instruction = "right"
-            else:
-                instruction = "straight"
-    else:
-        instruction = "idle"
-    
-    color_img = part2_checkoff(color_img, contours, lc_i, moment, midline, instruction)
+    instruction = "idle"
 
-    cv2.imshow("Capture", color_img)
+    '''
+    END OF PART 2
+    '''
     return instruction
 
+'''
+PART 3
+0. Before doing any of the following, arm your ESC by following the instructions in the
+   spec. You only have to do this once. Than the range will be remembered by the ESC
+1. Set up two GPIO pins of your choice, one for the ESC and one for the Servo.
+   IMPORTANT: Make sure your chosen pins aren't reserved for something else! See pinout.xyz
+   for more details.
+2. Start each pin with its respective "neutral" pwm signal. This should be around 8% for both.
+   The servo may be slightly off center. Fix this by readjusting the arm of the servo (unscrew it,
+   set the servo to neutral, make the wheel point straight, then reattach the arm). The arm may still
+   not be perfectly alighned so use the manual_pwm.py program to determine your Servo's best neutral
+   position.
+3. Start the motor at the full-forward position (duty cycle = 5.7).
 
-GPIO.setmode(GPIO.BOARD)
-GPIO.setwarnings(False)
-GPIO.setup(7, GPIO.OUT)
-GPIO.setup(37, GPIO.OUT)
+NOTE: If you change the variable names pwm_m and pwm_s, you'll also need to update the
+      cleanup code at the bottom of this skeleton.
 
-pwm_m = GPIO.PWM(7, 57)
-pwm_s = GPIO.PWM(37, 57)
+Checkoffs: None for this part!
+'''
 
-pwm_s.start(7.5)
-pwm_m.start(8)
-print("arming")
-time.sleep(3)
-print("armed")
+pwm_m = None
+pwm_s = None
+print("started!")
 
-pwm_m.ChangeDutyCycle(5.7)
+'''
+END OF PART 3
+'''
+
+'''
+PART 4
+1. 
+'''
 
 frame_count = 0
 left_count = 0
@@ -196,34 +205,29 @@ try:
     while True:
         if vs.pipe_out.poll():
             result = vs.read()
-            frame_count += 1
             img = cv2.rotate(result, cv2.ROTATE_180)
+            
+            frame_count += 1
             if frame_count == 1:
                 print(img.shape)
 
             instruction = detect_shape(img)
 
-            if instruction == "idle":
-                instruction = last_instruction
+            '''
+            PART 4
+            1. Figure out the values of your motor and Servo PWMs for each instruction
+               from `detect_shape()`.
+            2. Assign those values as appropriate to the motor and Servo pins. Remember
+               that an instruction of "idle" should leave the car's behavior UNCHANGED.
 
-            if instruction == "left":
-                left_count += 1
-                if left_count == 3:
-                    pwm_s.ChangeDutyCycle(10.3)
-                    left_count = 0
-            elif instruction == "right":
-                right_count += 1
-                if right_count == 3:
-                    pwm_s.ChangeDutyCycle(5.7)
-                    right_count = 0
-            elif instruction == "stop":
-                pwm_s.ChangeDutyCycle(7.5)
-                pwm_m.ChangeDutyCycle(8)
-            elif instruction == "straight":
-                pwm_s.ChangeDutyCycle(7.5)
-                pwm_m.ChangeDutyCycle(5.7)
+            Checkoffs: Show the leads your working car!
+            '''
 
             last_instruction = instruction
+
+            '''
+            END OF PART 4
+            '''
 
             k = cv2.waitKey(3)
             if k == ord('q'):
