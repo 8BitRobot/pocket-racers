@@ -104,6 +104,8 @@ def detect_shape(color_img):
     h, w = img.shape[:2]
     mask = np.zeros((h + 2, w + 2), np.uint8)
     cv2.floodFill(img, mask, (0, 0), 255)
+
+    cv2.imshow("img", img)
     '''
     END OF PART 1
     '''

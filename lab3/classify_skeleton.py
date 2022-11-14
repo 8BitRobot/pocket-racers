@@ -78,8 +78,8 @@ DO NOT CHANGE THIS FUNCTION.
 Annotates your filtered image with the values you calculate.
 
 PARAMETERS:
-img -               Your filtered BINARY image, converted to BGR or
-                    RGB form using cv2.cvtColor().
+img -               Your filtered BINARY image, converted to BGR form
+                    using cv2.cvtColor().
 
 contours -          The list of all contours in the image.
 
@@ -129,7 +129,7 @@ def detect_shape(color_img):
     Checkoffs: None for this part!
     '''
     
-    img = color_img
+    img = np.zeros((640,480), dtype=np.uint8)
 
     '''
     END OF PART 1
